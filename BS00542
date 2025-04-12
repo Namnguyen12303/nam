@@ -1,0 +1,84 @@
+<?php
+require 'vendor/autoload.php';
+
+use PhpOffice\PhpSpreadsheet\IOFactory;
+
+// Đường dẫn file
+$filePath = 'C:/Users/Nam/Downloads/Du lieu thang 1.xlsx';
+
+// Load file
+$spreadsheet = IOFactory::load($filePath);
+
+// --- Đọc "Ket Qua KD" ---
+$sheet1 = $spreadsheet->getSheetByName('Ket Qua KD');
+$data1 = $sheet1->toArray(null, true, true, true);
+
+// Bỏ dòng tiêu đề đầu tiên
+$headers1 = array_shift($data1);
+
+$ketQuaKD = [];
+foreach ($data1 as $row) {
+    $ngay = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($row['A'])->format('Y-m-d');
+    $maCH = $row['B'];
+    $doanhThu = (int)$row['C'];
+    $chiPhi = (int)$row['D'];
+    $loiNhuan = $doanhThu - $chiPhi;
+
+    if ($doanhThu > 0 && $loiNhuan > 0) {
+        $ketQuaKD[] = [
+            'Ngày' => $ngay,
+            'Mã Cửa Hàng' => $maCH,
+            'Doanh Thu' => $doanhThu,
+            'Chi Phí' => $chiPhi,
+            'Lợi Nhuận' => $loiNhuan,
+        ];
+    }
+}
+
+// --- Sắp xếp theo Lợi Nhuận giảm dần ---
+usort($ketQuaKD, function ($a, $b) {
+    return $b['Lợi Nhuận'] - $a['Lợi Nhuận'];
+});
+
+// --- Đọc "DS Cua Hang" ---
+$sheet2 = $spreadsheet->getSheetByName('DS Cua Hang');
+$data2 = $sheet2->toArray(null, true, true, true);
+
+$maCHToTinh = [];
+foreach ($data2 as $row) {
+    $maCHToTinh[$row['A']] = $row['B'];
+}
+
+// --- Đọc "DS Tinh" ---
+$sheet3 = $spreadsheet->getSheetByName('DS Tinh');
+$data3 = $sheet3->toArray(null, true, true, true);
+$headers3 = array_shift($data3);
+
+$tinhToKhuVuc = [];
+foreach ($data3 as $row) {
+    $tinhToKhuVuc[$row['B']] = [
+        'Khu Vực' => $row['A'],
+        'Latitude' => (float)$row['C'],
+        'Longitude' => (float)$row['D'],
+    ];
+}
+
+// --- Kết hợp dữ liệu ---
+$tongHop = [];
+foreach ($ketQuaKD as $item) {
+    $maCH = $item['Mã Cửa Hàng'];
+    $tinh = $maCHToTinh[$maCH] ?? null;
+    $kvData = $tinhToKhuVuc[$tinh] ?? ['Khu Vực' => null, 'Latitude' => null, 'Longitude' => null];
+
+    $tongHop[] = array_merge($item, [
+        'Tỉnh' => $tinh,
+        'Khu Vực' => $kvData['Khu Vực'],
+        'Latitude' => $kvData['Latitude'],
+        'Longitude' => $kvData['Longitude'],
+    ]);
+}
+
+// --- Xuất kết quả ---
+foreach ($tongHop as $row) {
+    echo implode(' | ', $row) . PHP_EOL;
+}
